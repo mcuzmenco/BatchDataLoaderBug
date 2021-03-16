@@ -1,0 +1,6 @@
+﻿WebApplication2/bin
+WebApplication2/obj
+*.user
+WebApplication2.Tests/bin
+WebApplication2.Tests/obj
+*.suo
