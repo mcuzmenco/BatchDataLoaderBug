@@ -10,7 +10,7 @@ namespace WebApplication2
 {
 	public class Query
 	{
-		int requestCount = 0;
+		int _requestCount;
 
 		public async Task<Book> Book(int id)
 		{
@@ -18,37 +18,35 @@ namespace WebApplication2
 			return new Book { Title = "C# in depth", Author = "Jon Skeet", Id = id };
 		}
 
-		public async Task<List<Book>> GetBooks(IResolverContext context)
+		public async Task<IReadOnlyList<Book>> GetBooks(IResolverContext context)
 		{
-			requestCount = 0;
+			_requestCount = 0;
 			var ids = Enumerable.Range(0, 100).ToImmutableList();
 
-			await Task.Delay(100);
+			await Task.Delay(1);
+			var books = await context.BatchDataLoader(
+				async (IReadOnlyList<int> bookIds, CancellationToken t) => {
+					Interlocked.Increment(ref _requestCount);
+					if (_requestCount > 1)
+					{
+						throw new Exception("Nope!");
+					}
 
-			var dataLoader = context.BatchDataLoader<int, Book>(async (bookIds, t) => await LoadBooks(bookIds));
-			var books = await dataLoader.LoadAsync(ids, context.RequestAborted);
+					var data = bookIds.Select(
+						x => new Book
+						{
+							Title = "C# in depth",
+							Author = "Jon Skeet",
+							Id = x
+						}
+					);
+
+					IReadOnlyDictionary<int, Book> result = data.ToDictionary(x => x.Id);
+					await Task.Delay(1);
+					return result;
+				}).LoadAsync(ids, context.RequestAborted);
+
 			return books.ToList();
-		}
-
-		Task<IReadOnlyDictionary<int, Book>> LoadBooks(IReadOnlyList<int> bookIds)
-		{
-			Interlocked.Increment(ref requestCount);
-			if (requestCount > 1)
-			{
-				throw new Exception("Nope!");
-			}
-
-			var data = bookIds.Select(
-				x => new Book
-				{
-					Title = "C# in depth",
-					Author = "Jon Skeet",
-					Id = x
-				}
-			);
-
-			IReadOnlyDictionary<int, Book> result = data.ToDictionary(x => x.Id);
-			return Task.FromResult(result);
 		}
 	}
 
